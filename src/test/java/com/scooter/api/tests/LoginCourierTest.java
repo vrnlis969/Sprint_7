@@ -12,96 +12,82 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.hamcrest.Matchers.*;
+import static org.apache.http.HttpStatus.*;
 
 @ExtendWith(AllureJunit5.class)
 public class LoginCourierTest {
     private CourierClient courierClient;
-    private int createdCourierId;
     private Courier courier;
+    private int courierId;
 
     @BeforeEach
     public void setUp() {
         courierClient = new CourierClient();
-    }
-
-    @AfterEach
-    public void cleanUp() {
-        if (createdCourierId != 0) {
-            courierClient.delete(createdCourierId)
-                    .statusCode(200)
-                    .body("ok", is(true));
-        }
-    }
-
-    private Courier createUniqueCourier() {
-        Courier courier = Courier.builder()
+        // Создаём уникального курьера для тестов логина
+        courier = Courier.builder()
                 .login("login" + System.currentTimeMillis())
                 .password("pass123")
                 .firstName("Name")
                 .build();
-        courierClient.create(courier).statusCode(201);
-        return courier;
-    }
-
-    private int loginAndGetId(Courier courier) {
+        courierClient.create(courier).statusCode(SC_CREATED);
+        // Логинимся, чтобы получить id
         CourierLogin login = new CourierLogin(courier.getLogin(), courier.getPassword());
-        return courierClient.login(login)
-                .statusCode(200)
+        courierId = courierClient.login(login)
+                .statusCode(SC_OK)
                 .extract().as(CourierLoginResponse.class)
                 .getId();
+    }
+
+    @AfterEach
+    public void cleanUp() {
+        courierClient.delete(courierId).statusCode(SC_OK);
     }
 
     @Test
     @Description("Курьер может авторизоваться")
     public void testLoginSuccess() {
-        courier = createUniqueCourier();
-        createdCourierId = loginAndGetId(courier);
-        assertTrue(createdCourierId > 0);
+        CourierLogin login = new CourierLogin(courier.getLogin(), courier.getPassword());
+        int id = courierClient.login(login)
+                .statusCode(SC_OK)
+                .extract().as(CourierLoginResponse.class)
+                .getId();
+        assertEquals(courierId, id, "ID должен совпадать с созданным");
     }
 
     @Test
     @Description("Запрос без логина должен возвращать 400")
     public void testLoginMissingLogin() {
-        courier = createUniqueCourier();
-        createdCourierId = loginAndGetId(courier);
-
         CourierLogin loginWithoutLogin = new CourierLogin(null, courier.getPassword());
         courierClient.login(loginWithoutLogin)
-                .statusCode(400)
+                .statusCode(SC_BAD_REQUEST)
                 .body("message", equalTo("Недостаточно данных для входа"));
     }
 
     @Test
     @Description("Запрос без пароля должен возвращать 400, но сейчас сервер возвращает 504 (проблема API)")
     public void testLoginMissingPassword() {
-        courier = createUniqueCourier();
-        createdCourierId = loginAndGetId(courier);
-
         CourierLogin loginWithoutPass = new CourierLogin(courier.getLogin(), null);
         ValidatableResponse response = courierClient.login(loginWithoutPass);
 
         int statusCode = response.extract().statusCode();
-        if (statusCode == 504) {
+        if (statusCode == SC_GATEWAY_TIMEOUT) { // 504
             fail("Сервер вернул 504 Gateway Timeout вместо ожидаемого 400. Это проблема API.");
         }
-        response.statusCode(400)
+        response.statusCode(SC_BAD_REQUEST)
                 .body("message", equalTo("Недостаточно данных для входа"));
     }
 
     @Test
     @Description("Система вернёт ошибку, если неправильно указать логин или пароль")
     public void testLoginWrongCredentials() {
-        courier = createUniqueCourier();
-        createdCourierId = loginAndGetId(courier);
-
         CourierLogin wrongPass = new CourierLogin(courier.getLogin(), "wrong");
         courierClient.login(wrongPass)
-                .statusCode(404)
+                .statusCode(SC_NOT_FOUND)
                 .body("message", equalTo("Учетная запись не найдена"));
 
         CourierLogin wrongLogin = new CourierLogin("nonexistent", courier.getPassword());
         courierClient.login(wrongLogin)
-                .statusCode(404)
+                .statusCode(SC_NOT_FOUND)
                 .body("message", equalTo("Учетная запись не найдена"));
     }
 
@@ -110,16 +96,18 @@ public class LoginCourierTest {
     public void testLoginNonExistentUser() {
         CourierLogin nonExistent = new CourierLogin("ghost", "pass");
         courierClient.login(nonExistent)
-                .statusCode(404)
+                .statusCode(SC_NOT_FOUND)
                 .body("message", equalTo("Учетная запись не найдена"));
     }
 
     @Test
     @Description("Успешный запрос возвращает id")
     public void testLoginReturnsId() {
-        courier = createUniqueCourier();
-        int id = loginAndGetId(courier);
-        createdCourierId = id;
+        CourierLogin login = new CourierLogin(courier.getLogin(), courier.getPassword());
+        int id = courierClient.login(login)
+                .statusCode(SC_OK)
+                .extract().as(CourierLoginResponse.class)
+                .getId();
         assertTrue(id > 0);
     }
 }

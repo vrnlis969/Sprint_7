@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.hamcrest.Matchers.*;
+import static org.apache.http.HttpStatus.*;
 
 @ExtendWith(AllureJunit5.class)
 public class CreateCourierTest {
@@ -27,10 +28,9 @@ public class CreateCourierTest {
 
     @AfterEach
     public void cleanUp() {
-        // Если курьер был создан и его ID сохранён, удаляем его
         if (createdCourierId != 0) {
             courierClient.delete(createdCourierId)
-                    .statusCode(200)
+                    .statusCode(SC_OK)
                     .body("ok", is(true));
         }
     }
@@ -38,7 +38,6 @@ public class CreateCourierTest {
     @Test
     @Description("Курьера можно создать")
     public void testCreateCourierSuccess() {
-        // Генерируем уникальные данные
         courier = Courier.builder()
                 .login("ninja" + System.currentTimeMillis())
                 .password("1234")
@@ -46,13 +45,12 @@ public class CreateCourierTest {
                 .build();
 
         ValidatableResponse response = courierClient.create(courier);
-        response.statusCode(201)
+        response.statusCode(SC_CREATED)
                 .body("ok", is(true));
 
-        // После создания нужно залогиниться, чтобы получить id для удаления
         CourierLogin login = new CourierLogin(courier.getLogin(), courier.getPassword());
         var loginResponse = courierClient.login(login)
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .extract().as(CourierLoginResponse.class);
         createdCourierId = loginResponse.getId();
         assertTrue(createdCourierId > 0, "ID курьера должен быть положительным");
@@ -61,7 +59,6 @@ public class CreateCourierTest {
     @Test
     @Description("Нельзя создать двух одинаковых курьеров")
     public void testCreateDuplicateCourier() {
-        // Создаём первого курьера
         courier = Courier.builder()
                 .login("duplicate" + System.currentTimeMillis())
                 .password("1234")
@@ -69,19 +66,17 @@ public class CreateCourierTest {
                 .build();
 
         courierClient.create(courier)
-                .statusCode(201)
+                .statusCode(SC_CREATED)
                 .body("ok", is(true));
 
-        // Получаем ID для удаления
         CourierLogin login = new CourierLogin(courier.getLogin(), courier.getPassword());
         var loginResponse = courierClient.login(login)
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .extract().as(CourierLoginResponse.class);
         createdCourierId = loginResponse.getId();
 
-        // Пытаемся создать курьера с таким же логином
         ValidatableResponse response = courierClient.create(courier);
-        response.statusCode(409)                     // реальный статус от сервера
+        response.statusCode(SC_CONFLICT)
                 .body("message", equalTo("Этот логин уже используется. Попробуйте другой."));
     }
 
@@ -94,7 +89,7 @@ public class CreateCourierTest {
                 .build();
 
         courierClient.create(courierWithoutLogin)
-                .statusCode(400)
+                .statusCode(SC_BAD_REQUEST)
                 .body("message", equalTo("Недостаточно данных для создания учетной записи"));
     }
 
@@ -107,7 +102,7 @@ public class CreateCourierTest {
                 .build();
 
         courierClient.create(courierWithoutPassword)
-                .statusCode(400)
+                .statusCode(SC_BAD_REQUEST)
                 .body("message", equalTo("Недостаточно данных для создания учетной записи"));
     }
 
@@ -121,21 +116,18 @@ public class CreateCourierTest {
                 .password(password)
                 .build();
 
-        // Создаём курьера без имени
         courierClient.create(courierWithoutFirstName)
-                .statusCode(201)
+                .statusCode(SC_CREATED)
                 .body("ok", is(true));
 
-        // Логинимся, чтобы получить ID для удаления
         CourierLogin loginCredentials = new CourierLogin(login, password);
         int id = courierClient.login(loginCredentials)
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .extract().as(CourierLoginResponse.class)
                 .getId();
 
-        // Удаляем курьера (не сохраняем в поле класса, чтобы не мешать @AfterEach)
         courierClient.delete(id)
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("ok", is(true));
     }
 
@@ -149,14 +141,13 @@ public class CreateCourierTest {
                 .build();
 
         var response = courierClient.create(courier)
-                .statusCode(201)
+                .statusCode(SC_CREATED)
                 .extract().as(CourierCreateResponse.class);
         assertTrue(response.isOk());
 
-        // Логинимся для получения id удаления
         CourierLogin login = new CourierLogin(courier.getLogin(), courier.getPassword());
         var loginResponse = courierClient.login(login)
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .extract().as(CourierLoginResponse.class);
         createdCourierId = loginResponse.getId();
     }

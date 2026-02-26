@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.apache.http.HttpStatus.*;
 
 @ExtendWith(AllureJunit5.class)
 public class CreateOrderTest {
@@ -27,7 +28,7 @@ public class CreateOrderTest {
                 Arguments.of(Collections.singletonList("BLACK")),
                 Arguments.of(Collections.singletonList("GREY")),
                 Arguments.of(Arrays.asList("BLACK", "GREY")),
-                Arguments.of(Collections.emptyList()) // пустой список = цвет не указан (поле будет пустым массивом)
+                Arguments.of(Collections.emptyList()) // пустой список = цвет не указан
         );
     }
 
@@ -39,7 +40,7 @@ public class CreateOrderTest {
                 .firstName("Naruto")
                 .lastName("Uchiha")
                 .address("Konoha, 142 apt.")
-                .metroStation("4")                    // исправлено: строка вместо int
+                .metroStation("4")
                 .phone("+7 800 355 35 35")
                 .rentTime(5)
                 .deliveryDate("2020-06-06")
@@ -48,7 +49,7 @@ public class CreateOrderTest {
                 .build();
 
         var response = orderClient.create(order)
-                .statusCode(201)
+                .statusCode(SC_CREATED)
                 .extract().as(OrderCreateResponse.class);
 
         assertTrue(response.getTrack() > 0, "Трек заказа должен быть положительным числом");
@@ -61,7 +62,7 @@ public class CreateOrderTest {
                 .firstName("Naruto")
                 .lastName("Uchiha")
                 .address("Konoha, 142 apt.")
-                .metroStation("4")                    // исправлено: строка вместо int
+                .metroStation("4")
                 .phone("+7 800 355 35 35")
                 .rentTime(5)
                 .deliveryDate("2020-06-06")
@@ -70,7 +71,7 @@ public class CreateOrderTest {
                 .build();
 
         var response = orderClient.create(order)
-                .statusCode(201)
+                .statusCode(SC_CREATED)
                 .extract().as(OrderCreateResponse.class);
 
         assertTrue(response.getTrack() > 0, "Трек заказа должен быть положительным числом");
